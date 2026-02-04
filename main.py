@@ -5,13 +5,20 @@ import time
 
 app = ur.Ursina(fullscreen=False)
 class Main(ur.Entity):
+    '''
+    Meant to be the father of them all. Forced to be the class pulling the strings
+    '''
     def __init__(self):
         super().__init__()
         self.players = []
         self.current_player = 0
         self.tile_positions = self.generate_tile_positions()
 
-    def generate_tile_positions(self):
+    def generate_tile_positions(self) -> ur.Vec3:
+        '''
+        Generate the 3D positions for each of the 40 Monopoly tiles around the board.
+        Returns a list of Vec3 positions.
+        '''
         # 40 tiles total. 
         # Using LOCAL coordinates relative to the board parent.
         # Board scale is (8, 0.1, 8). 
@@ -73,6 +80,9 @@ class Main(ur.Entity):
         return positions
 
     def move_bitch(self, amount):
+        '''
+        Move the current player piece by a specified amount of tiles.
+        '''
         print(f"""
             players: {self.players}
             amount: {amount}
@@ -81,6 +91,9 @@ class Main(ur.Entity):
         th.start()
 
     def spawn_piece(self, piece_type="cube", texture="1e5.jpeg"):
+        '''
+        Spawn a new player piece on the board.
+        '''
         if texture.endswith("gif"):
             player = Animated_Piece(piece_type=piece_type, texture=texture)
         else:
@@ -89,6 +102,7 @@ class Main(ur.Entity):
 
     def move(self, amount):
         curr_player = self.players[self.current_player]
+        self.current_player = (self.current_player + 1) % len(self.players)
         step_duration = 0.5
         
         jump_height = 7.5
@@ -111,6 +125,9 @@ class Main(ur.Entity):
             time.sleep(step_duration/2)
     
     def display_gif(self):
+        '''
+        Mario is the mastermind behind this game. He gets angry if you try to exit the game.
+        '''
         x = ur.Animation(name="mario-super-mario-64.gif", parent=ur.camera, position=(0,0,2), scale=(1.456, 0.91))
         x.pause()
         ur.invoke(x.start, delay=0.7)
@@ -121,6 +138,8 @@ class Main(ur.Entity):
 
 
 class Player_Piece(ur.Entity):
+    '''
+    Basic non-animated player piece.'''
     def __init__(self, piece_type="cube", texture="1e5.jpeg", start_position = (3.5, 0.25, -3.5)):
         self.start_position = start_position
         super().__init__(
@@ -141,6 +160,9 @@ class Player_Piece(ur.Entity):
 
 
 class Animated_Piece(ur.Animation):
+    '''
+    Animated player piece using a gif texture.
+    '''
     def __init__(self, piece_type="cube", texture="1e5.jpeg", start_position = (3.5, 0.25, -3.5)):
         self.start_position = start_position
         super().__init__(
@@ -159,6 +181,9 @@ class Animated_Piece(ur.Animation):
 
     
 class Board(ur.Entity):
+    '''
+    Destined to be the father of them all. 
+    '''
     def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.white):
         super().__init__(
             model="plane",
@@ -183,6 +208,9 @@ class Board(ur.Entity):
 
 
 class Camera(ur.Entity):
+    '''
+    Controls the camera movement and views.
+    '''
     def __init__(self):
         super().__init__()
 
@@ -223,6 +251,9 @@ class Camera(ur.Entity):
 
 
 class Dice(ur.Entity):
+    '''
+    Simulates two dice with basic physics.
+    '''
     def __init__(self, scale=0.25):
         super().__init__()
         self.dice_1 = ur.Entity(
@@ -249,6 +280,9 @@ class Dice(ur.Entity):
             dice.rolling = False
 
     def throw_dice(self):
+        '''
+        trhow em dices
+        '''
         for i in self.dices:
             # Start position high up
             i.position = (ur.random.uniform(-2, 2), 5, ur.random.uniform(-2, 2))
@@ -274,6 +308,9 @@ class Dice(ur.Entity):
             i.rolling = True
 
     def move_b(self):
+        '''
+        move
+        '''
         values = self.read_values()
         amount = values[0] + values[1]
 
@@ -349,6 +386,9 @@ class Dice(ur.Entity):
 
 
     def read_values(self):
+        '''
+        read values of the dice
+        '''
         values = []
         for i in self.dices:
             face_values = {
@@ -394,9 +434,9 @@ ur.camera.rotation_x = 22.5
 board = Board(scale=(8,0.1,8))
 main = Main()
 
-# piece = main.spawn_piece("cube", texture="1e5.jpeg")
-piece = main.spawn_piece("cube", texture="mario-super-mario-64.gif")
-
+piece1 = main.spawn_piece("cube", texture="1e5.jpeg")
+piece2 = main.spawn_piece("cube", texture="mario-super-mario-64.gif")
+main.pieces = [piece1, piece2]
 dice = Dice()
 
 ur.window.exit_button.on_click_setter(main.display_gif)

@@ -1,6 +1,6 @@
 import ursina as ur 
 import threading 
-
+from ursina.shaders import unlit_shader
 import time
 
 app = ur.Ursina(fullscreen=False)
@@ -123,6 +123,7 @@ class Main(ur.Entity):
             
             curr_player.animate_position(target_pos, duration=step_duration/2, curve=ur.curve.in_sine)
             time.sleep(step_duration/2)
+        
     
     def display_gif(self):
         '''
@@ -131,8 +132,6 @@ class Main(ur.Entity):
         x = ur.Animation(name="mario-super-mario-64.gif", parent=ur.camera, position=(0,0,2), scale=(1.456, 0.91))
         x.pause()
         ur.invoke(x.start, delay=0.7)
-        print(x.__sizeof__())
-        print(x.world_scale)
         ur.invoke(ur.application.quit, delay=3.7)
 
 
@@ -158,7 +157,7 @@ class Player_Piece(ur.Entity):
 
 
 
-
+  
 class Animated_Piece(ur.Animation):
     '''
     Animated player piece using a gif texture.
@@ -184,16 +183,199 @@ class Board(ur.Entity):
     '''
     Destined to be the father of them all. 
     '''
-    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.white):
+    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.black, texture="Board1"):
         super().__init__(
             model="plane",
-            texture="Board1",
+            texture=texture,
             scale=scale,
             color=color,
             position=position
         )
         
         self._rotating = False
+        self.cards = [
+            ("Start", (None, None)), ("Mediterranean Avenue", (60, "#964B00")), ("Community Chest", (None, None)), ("Baltic Avenue", (60, "#964B00")), ("Income Tax", (-200, None)), ("Reading Railroad", (200, None)),
+            ("Oriental Avenue", (100, "#00FFFF")), ("Chance", (None, None)), ("Vermont Avenue", (100, "#00FFFF")), ("Connecticut Avenue", (120, "#00FFFF")), ("Jail", (None, None)), ("St. Charles Place", (140, "#FF00FF")),
+            ("Electric Company", (150, None)), ("States Avenue", (140, "#FF00FF")), ("Virginia Avenue", (160, "#FF00FF")), ("Pennsylvania Railroad", (200, None)), ("St. James Place", (180, "#FF00FF")),
+            ("Community Chest", (None, None)), ("Tennessee Avenue", (180, "#FFA500")), ("New York Avenue", (200, "#FFA500")), ("Free Parking", (None, None)), ("Kentucky Avenue", (220, "#FF0000")),
+            ("Chance", (None, None)), ("Indiana Avenue", (220, "#FF0000")), ("Illinois Avenue", (240, "#FF0000")), ("B. & O. Railroad", (200, None)), ("Atlantic Avenue", (260, "#FFFF00")), ("Ventnor Avenue", (260, "#FFFF00")),
+            ("Water Works", (150, None)), ("Marvin Gardens", (280, "#FFFF00")), ("Go To Jail", (None, None)), ("Pacific Avenue", (300, "#008000")), ("North Carolina Avenue", (300, "#008000")),
+            ("Community Chest", (None, None)), ("Pennsylvania Avenue", (320, "#008000")), ("Short Line", (200, None)), ("Chance", (None, None)), ("Park Place", (350, "#0000FF")), ("Luxury Tax", (-100, None)), ("Boardwalk", (400, "#0000FF"))
+        ]
+        
+        if self.texture == None:
+            self.draw_board()
+
+    def draw_board(self):
+        '''
+        Draw the board with colored properties.
+        '''
+        
+        
+        # Geometry constants based on Main.generate_tile_positions logic
+        c = 0.4375                   # Center of the track (3.5 / 8)
+        k = 1.63                     # Corner width ratio
+        total_span = 2 * c           # 0.875
+        tile_width = total_span / (k + 9) # ~0.0823
+        corner_width = tile_width * k
+        
+        # Track depth matches approximately the corner width
+        track_depth = 0.125 
+
+        for i, (name, (price, color)) in enumerate(self.cards):
+            
+            side_index = i // 10
+            local_index = i % 10
+
+            # --- CORNERS ---
+            if local_index == 0:
+                if side_index == 0: pos = ur.Vec3(c, 0.01, -c)
+                elif side_index == 1: pos = ur.Vec3(-c, 0.01, -c)
+                elif side_index == 2: pos = ur.Vec3(-c, 0.01, c)
+                else: pos = ur.Vec3(c, 0.01, c)
+                
+                ent = ur.Entity(
+                    parent=self,
+                    model="plane",
+                    texture=name if price is None else None,
+                    position=pos,
+                    rotation=(0,0,0),
+                    scale=(corner_width * 0.95, 1, corner_width * 0.95), 
+                    #color=ur.color.hex("#8BEAD5"),
+                    shader=unlit_shader
+                ) 
+
+                continue
+            
+            # --- REGULAR TILES ---
+            # Calculate distance from the starting corner of the side to this tile
+            dist = (corner_width + tile_width) / 2 + (local_index - 1) * tile_width
+
+            scale_x = tile_width * 0.95
+            
+            # Determine coverage
+            if color is None:
+                # Full coverage for non-colored properties (Railroads, Utilities, etc)
+                scale_z = track_depth
+                offset = 0
+            else:
+                # Partial coverage for colored properties (leave 25% for color bar)
+                scale_z = track_depth * 0.75
+                # Align to outer edge
+                offset = (track_depth - scale_z) / 2
+
+            y_pos = 0.01 
+            
+            if side_index == 0:  # Bottom (Go -> Jail) | Right -> Left
+                pos = ur.Vec3(c - dist, y_pos, -c - offset)
+                rot = ur.Vec3(0, 0, 0)
+            elif side_index == 1:  # Left (Jail -> Free Parking) | Bottom -> Top
+                pos = ur.Vec3(-c - offset, y_pos, -c + dist)
+                rot = ur.Vec3(0, 90, 0)
+            elif side_index == 2:  # Top (Free Parking -> Go To Jail) | Left -> Right
+                pos = ur.Vec3(-c + dist, y_pos, c + offset)
+                rot = ur.Vec3(0, 180, 0)
+            else:  # Right (Go To Jail -> Go) | Top -> Bottom
+                pos = ur.Vec3(c + offset, y_pos, c - dist)
+                rot = ur.Vec3(0, 270, 0)
+            
+            par = ur.Entity(
+                parent=self,
+                model="plane",
+                position=pos,
+                rotation=rot,
+                scale=(scale_x, 1, scale_z), 
+                color=ur.color.hex("#8BEAD5"),
+                shader=unlit_shader
+            )
+            ur.Text.size=0.2
+            ur.Text(
+                    parent=par,
+                    text=name,
+                    #world_scale=2,
+                    position=(0, 0.1, 0.35),
+                    rotation=(90, 0, 0),
+                    origin=(0, 0),
+                    color=ur.color.black,
+                    wordwrap=True,
+                    world_scale=0.4
+                    #always_on_top=True
+                )
+            ur.Text.size=0.2
+            price = ur.Text(
+                    parent=par,
+                    text=f"${price}" if price is not None else "",
+                    #world_scale=2,
+                    position=(0, 0.1, -0.4 if par.scale_z == 0.125 else -0.35),
+                    rotation=(90, 0, 0),
+                    origin=(0, 0),
+                    color=ur.color.black,
+                    world_scale=0.4
+                    #always_on_top=True
+            )
+
+            # --- COLOR BAR ---
+            if color is not None:
+                bar_scale_z = track_depth * 0.25
+                # Offset to place the bar at the inner edge (facing center of board)
+                bar_offset = 0.375 * track_depth
+                
+                if side_index == 0:   # Bottom, inner edge is +Z
+                    bar_pos = ur.Vec3(c - dist, y_pos, -c + bar_offset)
+                elif side_index == 1: # Left, inner edge is +X
+                    bar_pos = ur.Vec3(-c + bar_offset, y_pos, -c + dist)
+                elif side_index == 2: # Top, inner edge is -Z
+                    bar_pos = ur.Vec3(-c + dist, y_pos, c - bar_offset)
+                else:                 # Right, inner edge is -X
+                    bar_pos = ur.Vec3(c - bar_offset, y_pos, c - dist)
+
+                ur.Entity(
+                    parent=self,
+                    model="plane",
+                    position=bar_pos,
+                    rotation=rot,
+                    scale=(scale_x, 1, bar_scale_z),
+                    color=ur.color.hex(color),
+                    shader=unlit_shader
+                )
+            else:
+                if "Railroad" in name or "Line" in name:
+                    name = "Railroad"
+                    scale = 0.4
+                elif "Income" in name: 
+                    ur.Entity(
+                        parent=par,
+                        model='plane',
+                        position=(0, 0.05, -0.05),
+                        color=ur.color.black,
+                        shader=unlit_shader,
+                        rotation=(0, 45, 0),
+                        scale=(0.15, 0.15, 0.15),
+                        always_on_top=True 
+                    )
+                    continue
+                else: 
+                    scale = 0.6
+                ur.Entity(
+                    parent=par,
+                    model='plane',
+                    texture=name,
+                    scale=(0.6, 1, scale),
+                    position=(0, 0.01, -0.05),
+                    rotation=(0, 0, 0),
+                    #color=ur.color.hex("#8BEAD5"),
+                    shader=unlit_shader
+                )
+        
+        self.middle_square = ur.Entity(
+            parent=self,
+            model="plane",
+            position=(0, 0.01, 0),
+            scale=(corner_width * 5.5, 1, corner_width * 5.5),
+            color=ur.color.hex("#8BEAD5"),
+            shader=unlit_shader
+        )
+        
     
     def rotate_board(self):
         if self._rotating:
@@ -215,8 +397,8 @@ class Camera(ur.Entity):
         super().__init__()
 
     def standard_camera(self):
-        while ur.camera.z > -22.5:
-            ur.camera.z -= 0.01
+        while ur.camera.z > -12.5:
+            ur.camera.z -= 0.007
             if ur.camera.y > 10:
                 ur.camera.y -= 0.0045
             ur.time.sleep(0.0005)
@@ -225,11 +407,10 @@ class Camera(ur.Entity):
         while ur.camera.z < 0:
             if ur.camera.y < 20:
                 ur.camera.y += 0.0045
-            ur.camera.z += 0.01
+            ur.camera.z += 0.007
             ur.time.sleep(0.0005)
 
     def update(self):
-
         ur.camera.look_at((0,0,0))
     
     def input(self, key):
@@ -247,6 +428,23 @@ class Camera(ur.Entity):
                 board.texture = "Board1.jpg"
             else:
                 board.texture = "mario.gif"
+
+
+
+class UI(ur.Entity):
+    '''
+    Manages the User Interface elements.
+    '''
+    def __init__(self):
+        super().__init__()
+        self.info_text = ur.Text(
+            parent=ur.camera,
+            text="Welcome to Monopoly!",
+            position=(-0.7, 0.4),
+            scale=2,
+            color=ur.color.white,
+            background=True
+        )
 
 
 
@@ -429,9 +627,10 @@ ground = ur.Entity(
 )
 
 
-ur.camera.position = (0, 10, -22.5)
-ur.camera.rotation_x = 22.5
-board = Board(scale=(8,0.1,8))
+ur.camera.position = (0, 10, -12.5)
+board = Board(scale=(8,0.1,8),
+              texture=None
+              )
 main = Main()
 
 piece1 = main.spawn_piece("cube", texture="1e5.jpeg")
@@ -440,6 +639,7 @@ main.pieces = [piece1, piece2]
 dice = Dice()
 
 ur.window.exit_button.on_click_setter(main.display_gif)
-
+#ur.mouse.visible = False
+#ur.Cursor(visible=True, texture="mario.gif", scale=0.05)
 
 app.run()

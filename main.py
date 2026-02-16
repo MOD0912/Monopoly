@@ -79,7 +79,7 @@ class Main(ur.Entity):
             
         return positions
 
-    def move_bitch(self, amount):
+    def move_bitch(self, amount, double=False):
         '''
         Move the current player piece by a specified amount of tiles.
         '''
@@ -87,8 +87,10 @@ class Main(ur.Entity):
             players: {self.players}
             amount: {amount}
               """)
-        th = threading.Thread(target=self.move, args=(amount,))
+        
+        th = threading.Thread(target=self.move, args=(amount, double))
         th.start()
+
 
     def spawn_piece(self, piece_type="cube", texture="1e5.jpeg"):
         '''
@@ -100,7 +102,7 @@ class Main(ur.Entity):
             player = Player_Piece(piece_type=piece_type, texture=texture)
         self.players.append(player)
 
-    def move(self, amount):
+    def move(self, amount, double=False):
         curr_player = self.players[self.current_player]
         self.current_player = (self.current_player + 1) % len(self.players)
         step_duration = 0.5
@@ -123,6 +125,12 @@ class Main(ur.Entity):
             
             curr_player.animate_position(target_pos, duration=step_duration/2, curve=ur.curve.in_sine)
             time.sleep(step_duration/2)
+
+        if double:
+            dice.throw_dice() 
+            main.current_player = (main.current_player - 1) % len(main.players)
+
+        
         
     
     def display_gif(self):
@@ -351,7 +359,7 @@ class Board(ur.Entity):
                         shader=unlit_shader,
                         rotation=(0, 45, 0),
                         scale=(0.15, 0.15, 0.15),
-                        always_on_top=True 
+                        #always_on_top=True 
                     )
                     continue
                 else: 
@@ -511,9 +519,15 @@ class Dice(ur.Entity):
         '''
         values = self.read_values()
         amount = values[0] + values[1]
-
-        main.move_bitch(amount)
+        double = False
+        if values[0] == values[1]:
+            double = True
+            print("DOUBLES! You get another turn!")
+            #ur.invoke(self.throw_dice, delay=0.5)
+        
+        main.move_bitch(amount, double)
         dice.cunt = 0 
+        
 
 
     def input(self, key):

@@ -13,6 +13,9 @@ class Main(ur.Entity):
         self.players = []
         self.current_player = 0
         self.tile_positions = self.generate_tile_positions()
+        # Simple custom tween state for the card display (avoids animate_position/animate_rotation).
+        self._card_tween = None
+        self._card_tween_on_done = None
 
     def generate_tile_positions(self) -> ur.Vec3:
         '''
@@ -104,7 +107,6 @@ class Main(ur.Entity):
 
     def move(self, amount, double=False):
         curr_player = self.players[self.current_player]
-        self.current_player = (self.current_player + 1) % len(self.players)
         step_duration = 0.5
         
         jump_height = 7.5
@@ -127,21 +129,117 @@ class Main(ur.Entity):
             time.sleep(step_duration/2)
 
         if double:
-            dice.throw_dice() 
-            main.current_player = (main.current_player - 1) % len(main.players)
+            ur.invoke(dice.throw_dice)
+        else:
+            ur.invoke(self.show_card, board.cards[curr_player.tile_position])
+            self.current_player = (self.current_player + 1) % len(self.players)
 
-        
-        
+            
     
     def display_gif(self):
         '''
         Mario is the mastermind behind this game. He gets angry if you try to exit the game.
         '''
         x = ur.Animation(name="mario-super-mario-64.gif", parent=ur.camera, position=(0,0,2), scale=(1.456, 0.91))
+        print("You can't escape Mario's wrath!")
+        print(x.world_position)
         x.pause()
         ur.invoke(x.start, delay=0.7)
         ur.invoke(ur.application.quit, delay=3.7)
+    
+    def show_card(self, card_name):
+        '''
+        Show a card on the UI. Meant to be used for Chance and Community Chest cards.
+        '''
+        # Placeholder implementation
+        if card_name[0] in ["Income Tax", "Luxury Tax", "Go To Jail", "Free Parking", "Jail", "Start"]:
+            return
+        
+        print(f"Showing card: {card_name}")
 
+        card_ent = card_name[2]
+        self.temp_card = card_ent
+
+        # Store original transform so we can put the tile back exactly.
+        self.temp_parent = card_ent.parent
+        self.temp_position = card_ent.position
+        self.temp_rotation = card_ent.rotation
+        self.temp_scale = card_ent.scale
+        self.temp_world_position = card_ent.world_position
+        self.temp_world_rotation = card_ent.world_rotation
+
+        # Move into camera-space for a stable "UI-like" animation.
+        card_ent.world_parent = ur.camera
+        card_ent.always_on_top = True
+
+        # Tween to a fixed spot in front of the camera (manual, dt-based).
+        self._card_tween = {
+            'entity': card_ent,
+            't': 0.0,
+            'duration': 1.0,
+            'start_pos': ur.Vec3(card_ent.position),
+            'end_pos': ur.Vec3(0, 0.01, 3),
+            'start_rot': ur.Vec3(card_ent.rotation),
+            'end_rot': ur.Vec3(-90 , 0, 0),
+            'curve': ur.curve.out_sine,
+        }
+        self._card_tween_on_done = None
+
+        ur.invoke(self.return_to_origin, delay=3)
+
+    def return_to_origin(self):
+
+            # Return in world space, then reattach to the board hierarchy.
+            self.temp_card.world_parent = ur.scene
+
+            # Tween back to the original world transform.
+            self._card_tween = {
+                'entity': self.temp_card,
+                't': 0.0,
+                'duration': 1.0,
+                'start_pos': ur.Vec3(self.temp_card.position),
+                'end_pos': ur.Vec3(self.temp_world_position),
+                'start_rot': ur.Vec3(self.temp_card.rotation),
+                'end_rot': ur.Vec3(self.temp_world_rotation),
+                'curve': ur.curve.in_sine,
+            }
+
+            def _reattach():
+                self.temp_card.parent = self.temp_parent
+                self.temp_card.position = self.temp_position
+                self.temp_card.rotation = self.temp_rotation
+                self.temp_card.scale = self.temp_scale
+                self.temp_card.always_on_top = False
+
+            self._card_tween_on_done = _reattach
+
+
+    def update(self):
+        # Drive the custom card tween each frame.
+        if not self._card_tween:
+            return
+
+        tw = self._card_tween
+        ent = tw['entity']
+
+        tw['t'] += ur.time.dt
+        duration = max(1e-6, tw['duration'])
+        p = min(1.0, tw['t'] / duration)
+        eased = tw['curve'](p) if tw.get('curve') else p
+
+        ent.position = ur.lerp(tw['start_pos'], tw['end_pos'], eased)
+        ent.rotation = ur.lerp(tw['start_rot'], tw['end_rot'], eased)
+
+        if p < 1.0:
+            return
+
+        # Finish.
+        self._card_tween = None
+        if self._card_tween_on_done:
+            cb = self._card_tween_on_done
+            self._card_tween_on_done = None
+            cb()
+        
 
 
 class Player_Piece(ur.Entity):
@@ -252,6 +350,8 @@ class Board(ur.Entity):
                     #color=ur.color.hex("#8BEAD5"),
                     shader=unlit_shader
                 ) 
+                self.cards[i] = (self.cards[i][0], self.cards[i][1], ent) # Store entity reference for corners
+
 
                 continue
             
@@ -297,7 +397,7 @@ class Board(ur.Entity):
                 shader=unlit_shader
             )
             ur.Text.size=0.2
-            ur.Text(
+            name_txt = ur.Text(
                     parent=par,
                     text=name,
                     #world_scale=2,
@@ -321,6 +421,7 @@ class Board(ur.Entity):
                     world_scale=0.4
                     #always_on_top=True
             )
+            self.cards[i] = (self.cards[i][0], self.cards[i][1], par)
 
             # --- COLOR BAR ---
             if color is not None:
@@ -337,21 +438,23 @@ class Board(ur.Entity):
                 else:                 # Right, inner edge is -X
                     bar_pos = ur.Vec3(c - bar_offset, y_pos, c - dist)
 
-                ur.Entity(
-                    parent=self,
+                color_bar = ur.Entity(
+                    parent=par,
                     model="plane",
-                    position=bar_pos,
-                    rotation=rot,
-                    scale=(scale_x, 1, bar_scale_z),
+                    world_position=bar_pos/0.125,
+                    world_rotation=rot,
+                    world_scale=ur.Vec3(scale_x, 1, bar_scale_z)/0.125,
                     color=ur.color.hex(color),
                     shader=unlit_shader
                 )
+                color_bar.y = 0.01
+
             else:
                 if "Railroad" in name or "Line" in name:
                     name = "Railroad"
                     scale = 0.4
                 elif "Income" in name: 
-                    ur.Entity(
+                    ent = ur.Entity(
                         parent=par,
                         model='plane',
                         position=(0, 0.05, -0.05),
@@ -364,7 +467,7 @@ class Board(ur.Entity):
                     continue
                 else: 
                     scale = 0.6
-                ur.Entity(
+                ent = ur.Entity(
                     parent=par,
                     model='plane',
                     texture=name,
@@ -374,6 +477,7 @@ class Board(ur.Entity):
                     #color=ur.color.hex("#8BEAD5"),
                     shader=unlit_shader
                 )
+                #self.cards[name] = (self.cards[name][0], self.cards[name][1], ent)
         
         self.middle_square = ur.Entity(
             parent=self,
@@ -647,7 +751,8 @@ board = Board(scale=(8,0.1,8),
               )
 main = Main()
 
-piece1 = main.spawn_piece("cube", texture="1e5.jpeg")
+#piece1 = main.spawn_piece("cube", texture="1e5.jpeg")
+piece1 = main.spawn_piece("cube", texture="gd.jpg")
 piece2 = main.spawn_piece("cube", texture="mario-super-mario-64.gif")
 main.pieces = [piece1, piece2]
 dice = Dice()

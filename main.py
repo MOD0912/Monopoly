@@ -3,7 +3,7 @@ import threading
 from ursina.shaders import unlit_shader
 import time
 
-app = ur.Ursina(fullscreen=False)
+app = ur.Ursina(fullscreen=True)
 class Main(ur.Entity):
     '''
     Meant to be the father of them all. Forced to be the class pulling the strings
@@ -16,6 +16,9 @@ class Main(ur.Entity):
         # Simple custom tween state for the card display (avoids animate_position/animate_rotation).
         self._card_tween = None
         self._card_tween_on_done = None
+        ur.Text.size=0.05
+        self.buy = ur.Button(parent=ur.camera.ui, text="Buy", color=ur.color.blue, position=(-0.115, -0.4), scale=(0.115*2, 0.1), on_click=self.buy_property, enabled=False)
+        self.auction = ur.Button(parent=ur.camera.ui, text="Auction", color=ur.color.white, position=(0.115, -0.4), scale=(0.115*2, 0.1), on_click=self.auction_property, enabled=False, text_color=ur.color.black)
 
     def generate_tile_positions(self) -> ur.Vec3:
         '''
@@ -104,6 +107,7 @@ class Main(ur.Entity):
         else:
             player = Player_Piece(piece_type=piece_type, texture=texture)
         self.players.append(player)
+        return player
 
     def move(self, amount, double=False):
         curr_player = self.players[self.current_player]
@@ -115,6 +119,7 @@ class Main(ur.Entity):
             curr_player.tile_position = (curr_player.tile_position + 1) % 40
             
             target_pos = self.tile_positions[curr_player.tile_position]
+                
             
             curr_player.animate_y(jump_height, duration=step_duration/2, curve=ur.curve.out_sine)
             curr_player.animate_position(
@@ -178,40 +183,65 @@ class Main(ur.Entity):
             't': 0.0,
             'duration': 1.0,
             'start_pos': ur.Vec3(card_ent.position),
-            'end_pos': ur.Vec3(0, 0.01, 3),
+            'end_pos': ur.Vec3(0, -0.11, 3) if self.temp_card.bar_color != None else ur.Vec3(0, 0.02, 3),
             'start_rot': ur.Vec3(card_ent.rotation),
             'end_rot': ur.Vec3(-90 , 0, 0),
             'curve': ur.curve.out_sine,
         }
         self._card_tween_on_done = None
-
-        ur.invoke(self.return_to_origin, delay=3)
+        print(ur.camera.rotation)
+        cam.look_at_board = False
+        cam.look_at_card()
+        #ur.invoke(cam.return_to_board_view, delay=2.0)
+        ur.invoke(self.interact_with_card, delay=1.0 )
+        #ur.camera.animate_rotation((0, 0, 0), duration=1.0, curve=ur.curve.linear)
+        #ur.invoke(self.return_to_origin, delay=3)
 
     def return_to_origin(self):
 
-            # Return in world space, then reattach to the board hierarchy.
-            self.temp_card.world_parent = ur.scene
+        # Return in world space, then reattach to the board hierarchy.
+        self.temp_card.world_parent = ur.scene
 
-            # Tween back to the original world transform.
-            self._card_tween = {
-                'entity': self.temp_card,
-                't': 0.0,
-                'duration': 1.0,
-                'start_pos': ur.Vec3(self.temp_card.position),
-                'end_pos': ur.Vec3(self.temp_world_position),
-                'start_rot': ur.Vec3(self.temp_card.rotation),
-                'end_rot': ur.Vec3(self.temp_world_rotation),
-                'curve': ur.curve.in_sine,
-            }
+        # Tween back to the original world transform.
+        self._card_tween = {
+            'entity': self.temp_card,
+            't': 0.0,
+            'duration': 1.0,
+            'start_pos': ur.Vec3(self.temp_card.position),
+            'end_pos': ur.Vec3(self.temp_world_position),
+            'start_rot': ur.Vec3(self.temp_card.rotation),
+            'end_rot': ur.Vec3(self.temp_world_rotation),
+            'curve': ur.curve.in_sine,
+        }
 
-            def _reattach():
-                self.temp_card.parent = self.temp_parent
-                self.temp_card.position = self.temp_position
-                self.temp_card.rotation = self.temp_rotation
-                self.temp_card.scale = self.temp_scale
-                self.temp_card.always_on_top = False
+        def _reattach():
+            self.temp_card.parent = self.temp_parent
+            self.temp_card.position = self.temp_position
+            self.temp_card.rotation = self.temp_rotation
+            self.temp_card.scale = self.temp_scale
+            self.temp_card.always_on_top = False
 
-            self._card_tween_on_done = _reattach
+        self._card_tween_on_done = _reattach
+
+    def interact_with_card(self):
+        self.buy.enable()
+        self.auction.enable()    
+        
+    def buy_property(self):
+        print("Property bought!")
+        # Implement property buying logic here (e.g., deduct money, assign ownership, etc.)
+        self.reset_card()   
+    
+    def auction_property(self):
+        print("Property auctioned!")
+        # Implement auction logic here (e.g., start bidding process, determine winner, etc.)
+        self.reset_card()
+    
+    def reset_card(self):
+        self.buy.disable()
+        self.auction.disable()
+        cam.return_to_board_view()
+        self.return_to_origin()
 
 
     def update(self):
@@ -260,6 +290,9 @@ class Player_Piece(ur.Entity):
             world_scale=0.5
         )
         self.tile_position = 0
+        self.p_name = "Player 2"
+        self.money = 1500
+        self.tex = texture
 
 
 
@@ -282,6 +315,9 @@ class Animated_Piece(ur.Animation):
                 world_scale=0.5
                 )
         self.tile_position = 0
+        self.p_name = "Player 1"
+        self.money = 1500 
+        self.tex = texture
 
 
     
@@ -394,7 +430,8 @@ class Board(ur.Entity):
                 rotation=rot,
                 scale=(scale_x, 1, scale_z), 
                 color=ur.color.hex("#8BEAD5"),
-                shader=unlit_shader
+                shader=unlit_shader,
+                bar_color=None
             )
             ur.Text.size=0.2
             name_txt = ur.Text(
@@ -421,6 +458,7 @@ class Board(ur.Entity):
                     world_scale=0.4
                     #always_on_top=True
             )
+
             self.cards[i] = (self.cards[i][0], self.cards[i][1], par)
 
             # --- COLOR BAR ---
@@ -438,7 +476,7 @@ class Board(ur.Entity):
                 else:                 # Right, inner edge is -X
                     bar_pos = ur.Vec3(c - bar_offset, y_pos, c - dist)
 
-                color_bar = ur.Entity(
+                par.bar_color = ur.Entity(
                     parent=par,
                     model="plane",
                     world_position=bar_pos/0.125,
@@ -447,7 +485,7 @@ class Board(ur.Entity):
                     color=ur.color.hex(color),
                     shader=unlit_shader
                 )
-                color_bar.y = 0.01
+                par.bar_color.y = 0.01
 
             else:
                 if "Railroad" in name or "Line" in name:
@@ -507,6 +545,7 @@ class Camera(ur.Entity):
     '''
     def __init__(self):
         super().__init__()
+        self.look_at_board = True
 
     def standard_camera(self):
         while ur.camera.z > -12.5:
@@ -523,7 +562,23 @@ class Camera(ur.Entity):
             ur.time.sleep(0.0005)
 
     def update(self):
-        ur.camera.look_at((0,0,0))
+        if self.look_at_board:
+            ur.camera.look_at((0,0,0))
+    
+    def look_at_card(self):
+        self.look_at_board = False
+        ur.camera.animate_rotation((0, 0, 0), duration=1.0, curve=ur.curve.in_cubic)
+        ur.camera.animate_y(3.5, duration=1.0, curve=ur.curve.in_cubic)
+    
+    def return_to_board_view(self):
+        ur.camera.animate_rotation((38.647682, 0, 0), duration=1.0, curve=ur.curve.in_cubic)
+        ur.camera.animate_y(10, duration=1.0, curve=ur.curve.in_cubic)
+        ur.invoke(self.look_at_board_func, delay=1.0)
+
+    def look_at_board_func(self):
+        self.look_at_board = True
+
+        
     
     def input(self, key):
         if key == "1":
@@ -548,16 +603,39 @@ class UI(ur.Entity):
     Manages the User Interface elements.
     '''
     def __init__(self):
-        super().__init__()
-        self.info_text = ur.Text(
-            parent=ur.camera,
-            text="Welcome to Monopoly!",
-            position=(-0.7, 0.4),
-            scale=2,
-            color=ur.color.white,
-            background=True
-        )
+        super().__init__(model=ur.Quad(aspect=0.75, radius=0.05), parent=ur.camera.ui, position=(0.8, 0.3), scale=(.2, .0), color=ur.color.rgba(0, 0, 0, 0.5), origin=(0.5, 0.5))
+        self.pos = (-0.14+self.position[0]*20, -1+self.position[1]*20, -0.1)
+        
 
+    def add_player_info(self, player):
+        print(player.tex)
+        if player.tex.endswith("gif"):
+            self.bg = ur.Animation(model=ur.Quad(aspect=2, radius=0.05),name=player.tex, parent=self, world_position=self.pos, world_scale=(3.7, 1.7), color=ur.color.rgba(1, 1, 1, .5), origin=(0.5, 0))
+        else:
+            self.bg = ur.Entity(model=ur.Quad(aspect=2, radius=0.05), texture=player.tex, parent=self, world_position=self.pos, world_scale=(3.7, 1.7), color=ur.color.rgba(1, 1, 1, .5), origin=(0.5, 0))
+        print(self.pos)
+        print(self.bg.world_position)
+        print(self.bg.world_scale)
+        ur.Text.default_resolution = 2160 * ur.Text.size
+        self.info_text = ur.Text(
+            parent=self.bg,
+            text=f"{player.p_name}\n${player.money}",
+            position=(-0.5, 0.2), 
+            scale=(2, 4), 
+            origin=(0, 0.5), 
+            color=ur.color.white, 
+            wordwrap=25,
+            #background=True
+ 
+        )
+        self.bg.world_parent = ur.camera.ui
+        self.pos = tuple(x + y for x, y in zip(self.pos, (0, -2, 0)))
+
+        self.scale = tuple(x + y for x, y in zip(self.scale, (0, 0.1, 0)))
+        print("---"*10)
+        print(self.info_text.background_entity)
+        print("---"*10)
+        print(ur.camera.ui.scale)
 
 
 class Dice(ur.Entity):
@@ -741,10 +819,11 @@ ground = ur.Entity(
     #texture="mario_dark.gif",
     scale=(20,1,20),
     color=ur.color.gray,
-    position=(0,-0.1,0)
+    position=(0,-0.1,0),
+    shader = unlit_shader
 )
 
-
+#sky = ur.Sky(texture="1e5.jpeg")
 ur.camera.position = (0, 10, -12.5)
 board = Board(scale=(8,0.1,8),
               texture=None
@@ -752,11 +831,21 @@ board = Board(scale=(8,0.1,8),
 main = Main()
 
 #piece1 = main.spawn_piece("cube", texture="1e5.jpeg")
-piece1 = main.spawn_piece("cube", texture="gd.jpg")
-piece2 = main.spawn_piece("cube", texture="mario-super-mario-64.gif")
-main.pieces = [piece1, piece2]
+
+for i in range(2):
+    piece1 = main.spawn_piece("cube", texture="gd.jpg")
+
+    piece2 = main.spawn_piece("cube", texture="mario-super-mario-64.gif")
+
+    piece3 = main.spawn_piece("cube", texture="1e5.jpeg")
+
+
 dice = Dice()
 
+ui = UI()
+
+for i in main.players:
+    ui.add_player_info(i)
 ur.window.exit_button.on_click_setter(main.display_gif)
 #ur.mouse.visible = False
 #ur.Cursor(visible=True, texture="mario.gif", scale=0.05)

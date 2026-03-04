@@ -7,6 +7,11 @@ class UI(ur.Entity):
     def __init__(self):
         super().__init__(model=ur.Quad(aspect=0.75, radius=0.02), parent=ur.camera.ui, position=(0.8, 0.3), scale=(.2, .0), color=ur.color.rgba(0, 0, 0, 0.5), origin=(0.5, 0.5))
         self.pos = (-0.14+self.position[0]*20, -1+self.position[1]*20, -0.1)
+        top = ur.Animation(parent=ur.camera.ui, name='wth', position=(0, 0.5), scale=(1.6, 0.01), fps=12, loop=True, autoplay=True)
+        left = ur.Animation(parent=ur.camera.ui, name='wth', position=(-0.799, 0), scale=(1, 0.01), rotation=(0, 0, -90), fps=10, loop=True, autoplay=True)
+        right = ur.Animation(parent=ur.camera.ui, name='wth', position=(0.799, 0), scale=(1, 0.01), rotation=(0, 0, 90), fps=12, loop=True, autoplay=True)
+        bottom = ur.Animation(parent=ur.camera.ui, name='wth', position=(0, -0.498), scale=(1.6, 0.01), fps=12, loop=True, autoplay=True)
+
         
 
     def add_player_info(self, player):

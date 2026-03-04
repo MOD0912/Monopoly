@@ -24,32 +24,31 @@ Install dependencies with:
 python -m pip install -r requirements.txt
 ```
 
-What’s included in `requirements.txt`:
-- Core runtime: `ursina` (brings in Panda3D)
-- Tooling (only needed for `tools/` scripts): `Pillow`, `opencv-python`, `numpy`
-
 ## Assets
 
 - Board texture(s): `assets/Board1.jpg`, `assets/Printables.jpg`, etc.
 - Dice model: `assets/pieces/models/dice.glb`
 - Piece textures/gifs: `assets/pieces/textuers/`
 
-## Controls (current)
+## Controls
 
-- `Space`: throw dice
-- `M`: move by 1 (debug)
-- `1`: camera standard view motion
-- `2`: camera top-down view motion
-- `3`: rotate board
-- `4`: toggle board texture
+- `Space`: Roll dice
+- `M`: Move by 1 (debug)
+- `1`: Standard camera view (animated)
+- `2`: Top-down camera view (animated)
+- `3`: Rotate board
+- `4`: Toggle board texture (Mario / Classic)
+- `Escape`: Quit (with a surprise)
 
-## Repo layout
+## Project Structure
 
-- `main.py`: main game prototype / entrypoint
-- `tools/extract_printables.py`: extracts/crops assets from `assets/Printables.jpg`
-- `tools/process_textures.py`: batch background replacement / rotation for card textures
+The project has been refactored into a modular structure:
 
-## Known rough edges
-
-- The code is prototype-quality (threading + sleeps drive some animation).
-- Some naming/paths are inconsistent (e.g. `textuers/`).
+- `main.py`: Entry point. Initializes the app and entities.
+- `game.py`: Core game logic (`Main` class).
+- `board.py`: Board generation and rendering.
+- `player.py`: Player pieces.
+- `camera.py`: Camera controls (uses smooth animations).
+- `dice.py`: Dice physics.
+- `ui.py`: UI management.
+- `card.py`: Card data structure.

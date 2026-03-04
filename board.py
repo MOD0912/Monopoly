@@ -6,7 +6,7 @@ class Board(ur.Entity):
     '''
     Destined to be the father of them all. 
     '''
-    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.black, texture="Board1"):
+    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.black, texture="Board1", map="maps/Map1.txt"):
         super().__init__(
             model="plane",
             texture=texture,
@@ -16,49 +16,19 @@ class Board(ur.Entity):
         )
         
         self._rotating = False
-        # (TIle , (Price, Color, owned_by, EntityReference))
-        self.cards = [
-            Card("Start"), 
-            Card("Mediterranean Avenue", 60, "#964B00"), 
-            Card("Community Chest"), 
-            Card("Baltic Avenue", 60, "#964B00"), 
-            Card("Income Tax", -200), 
-            Card("Reading Railroad", 200),
-            Card("Oriental Avenue", 100, "#00FFFF"), 
-            Card("Chance"), 
-            Card("Vermont Avenue", 100, "#00FFFF"), 
-            Card("Connecticut Avenue", 120, "#00FFFF"), 
-            Card("Jail"), 
-            Card("St. Charles Place", 140, "#FF00FF"),
-            Card("Electric Company", 150), 
-            Card("States Avenue", 140, "#FF00FF"), 
-            Card("Virginia Avenue", 160, "#FF00FF"), 
-            Card("Pennsylvania Railroad", 200), 
-            Card("St. James Place", 180, "#FF00FF"),
-            Card("Community Chest"), 
-            Card("Tennessee Avenue", 180, "#FFA500"), 
-            Card("New York Avenue", 200, "#FFA500"), 
-            Card("Free Parking"), 
-            Card("Kentucky Avenue", 220, "#FF0000"),
-            Card("Chance"), 
-            Card("Indiana Avenue", 220, "#FF0000"), 
-            Card("Illinois Avenue", 240, "#FF0000"), 
-            Card("B. & O. Railroad", 200), 
-            Card("Atlantic Avenue", 260, "#FFFF00"), 
-            Card("Ventnor Avenue", 260, "#FFFF00"),
-            Card("Water Works", 150), 
-            Card("Marvin Gardens", 280, "#FFFF00"), 
-            Card("Go To Jail"), 
-            Card("Pacific Avenue", 300, "#8B4513"), 
-            Card("North Carolina Avenue", 325, "#8B4513"),
-            Card("Community Chest"), 
-            Card("Pennsylvania Avenue", 355, "#8B4513"), 
-            Card("Short Line", 275),
-            Card("Chance") ,
-            Card("Park Place ", 375,"#4B4B4B") ,
-            Card("Luxury Tax",-175), 
-            Card("Boardwalk", 475,"#4B4B4B")
-        ]
+        self.cards = []
+        try:
+            with open(map, "r") as file:
+                for line in file:
+                    parts = line.strip().split(";")
+                    name = parts[0]
+                    price = int(parts[1]) if parts[1] else None
+                    color = parts[2] if len(parts) > 2 and parts[2] else None
+                    self.cards.append(Card(name, price, color))
+        except FileNotFoundError:
+            print("Error: Map file not found. Please create 'maps/Map1.txt'.")
+            # Fallback or exit? For now, empty list will likely crash later code, 
+            # but printing error is standard.
         
         if self.texture == None:
             self.draw_board()

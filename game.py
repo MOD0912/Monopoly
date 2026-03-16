@@ -1,7 +1,5 @@
 import ursina as ur
 from player import Player_Piece, Animated_Piece
-from card import Card
-
 class Main(ur.Entity):
     '''
     Meant to be the father of them all. Forced to be the class pulling the strings
@@ -15,11 +13,13 @@ class Main(ur.Entity):
         self.ui = ui_instance
         self.dice = None # Generated later
 
+        self.ready = True # Used to prevent dice throwing at inappropriate times (e.g., during animations or card interactions).
+
         self.tile_positions = self.generate_tile_positions()
         self._moving = False
         self._steps_left = 0
         self._move_double = False
-        self._step_duration = 0.5
+        self._step_duration = 0.1
         self._jump_height = 7.5
         # Simple custom tween state for the card display (avoids animate_position/animate_rotation).
         self._card_tween = None
@@ -104,7 +104,7 @@ class Main(ur.Entity):
             players: {self.players}
             amount: {amount}
               """)
-
+        amount = 3
         self.start_move(amount, double)
 
 
@@ -141,9 +141,15 @@ class Main(ur.Entity):
             if self._move_double:
                 if self.dice:
                     ur.invoke(self.dice.throw_dice)
-            else:
-                ur.invoke(self.show_card, self.board.cards[curr_player.tile_position])
-                self.current_player = (self.current_player + 1) % len(self.players)
+            elif self.board.cards[curr_player.tile_position].owner is not None:
+                self.board.cards[curr_player.tile_position].owner.money += self.board.cards[curr_player.tile_position].rent[0]
+                curr_player.money -= self.board.cards[curr_player.tile_position].rent[0]
+                print(f"Paid rent of {self.board.cards[curr_player.tile_position].rent[0]} to {self.board.cards[curr_player.tile_position].owner}.")
+                self.reset_card()
+                
+
+            else:    
+                ur.invoke(self.show_card, self.board.cards[curr_player.tile_position])            
             return
 
         curr_player.tile_position = (curr_player.tile_position + 1) % 40
@@ -174,7 +180,7 @@ class Main(ur.Entity):
         
     def show_card(self, card):
             '''
-            Show a card on the UI. Meant to be used for Chance and Community Chest cards.
+            Valla Kriese
             '''
             # Placeholder implementation
             if card.name in ["Income Tax", "Luxury Tax", "Go To Jail", "Free Parking", "Jail", "Start"]:
@@ -262,16 +268,23 @@ class Main(ur.Entity):
         self.reset_card()    
         
     def buy_property(self):
-        if self.players[self.current_player].money < self.card_price:
+        curr_player = self.players[self.current_player]
+        if curr_player.money < self.card_price:
             print("Not enough money to buy this property.")
             return
         print("Property bought!")
-        self.players[self.current_player].money -= self.card_price
+        print(curr_player.money)
+        curr_player.money -= self.card_price
+        print(curr_player.money)
         print(self.card)
-        self.card.owner = self.players[self.current_player]
+        self.card.owner = curr_player
+        print(self.card.owner)
         if self.temp_card.bar_color != None:
-            self.temp_card.bar_color.color = self.players[self.current_player].user_color
-        
+            self.temp_card.bar_color.color = curr_player.user_color
+        if self.temp_card.texture != None:
+            print(curr_player.texture)
+            self.temp_card.texture = curr_player.texture
+                    
         self.reset_card()   
     
     def auction_property(self):
@@ -280,6 +293,9 @@ class Main(ur.Entity):
         self.reset_card()
     
     def reset_card(self):
+        self.ui.update_ui(self.players[self.current_player])
+        self.ready = True
+        self.current_player = (self.current_player + 1) % len(self.players)
         self.buy.disable()
         self.auction.disable()
         self.cam.return_to_board_view()
@@ -312,3 +328,7 @@ class Main(ur.Entity):
             cb = self._card_tween_on_done
             self._card_tween_on_done = None
             cb()
+
+
+if __name__ == "__main__":
+    import main

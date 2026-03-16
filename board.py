@@ -1,12 +1,13 @@
 import ursina as ur
 from ursina.shaders import unlit_shader
 from card import Card
+import json
 
 class Board(ur.Entity):
     '''
     Destined to be the father of them all. 
     '''
-    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.black, texture="Board1", map="maps/Map1.txt"):
+    def __init__(self, position=(0,0,0), scale=(1,1,1), color=ur.color.black, texture="Board1", map="Leon"):
         super().__init__(
             model="plane",
             texture=texture,
@@ -14,21 +15,39 @@ class Board(ur.Entity):
             color=color,
             position=position
         )
-        
+        self.player_count = 0
         self._rotating = False
         self.cards = []
+        self.streets = {}
+        prices = json.load(open(f"maps/{map}.json", "r"))
         try:
-            with open(map, "r") as file:
+            with open(f"maps/{map}.txt", "r") as file:
                 for line in file:
                     parts = line.strip().split(";")
                     name = parts[0]
                     price = int(parts[1]) if parts[1] else None
                     color = parts[2] if len(parts) > 2 and parts[2] else None
-                    self.cards.append(Card(name, price, color))
+                    if price is not None and name not in ["Income Tax", "Luxury Tax", "Electric Company", "Water Works"] and ("Railroad" or "Line") not in name:
+                        print(price)
+                        print(name)
+                        rent = prices[str(price)] 
+                    else:
+                        
+                        rent = None
+                    print(price)
+                    card = Card(name, price, color, rent)
+                    self.cards.append(card)
+
+                    if color and color not in self.streets:
+                        self.streets[color] = [card]
+                    elif color:
+                        self.streets[color].append(card)
+            print(self.streets)
         except FileNotFoundError:
             print("Error: Map file not found. Please create 'maps/Map1.txt'.")
             # Fallback or exit? For now, empty list will likely crash later code, 
-            # but printing error is standard.
+            # but printing error is standard.s
+        
         
         if self.texture == None:
             self.draw_board()
@@ -224,3 +243,7 @@ class Board(ur.Entity):
         target_y = self.rotation_y - 90
         self.animate_rotation_y(target_y, duration=duration, curve=ur.curve.in_out_sine)
         ur.invoke(setattr, self, "_rotating", False, delay=duration)
+
+
+if __name__ == "__main__":
+    import main

@@ -59,3 +59,7 @@ class Camera(ur.Entity):
                     self.board.texture = "Board1.jpg"
                 else:
                     self.board.texture = "mario.gif"
+
+
+if __name__ == "__main__":
+    import main

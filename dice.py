@@ -32,7 +32,7 @@ class Dice(ur.Entity):
 
     def throw_dice(self):
         '''
-        trhow em dices
+        throw em dice
         '''
         for i in self.dices:
             # Start position high up
@@ -77,9 +77,11 @@ class Dice(ur.Entity):
 
 
     def input(self, key):
-        if key == "space":
+        if key == "space" and self.game.ready:
             # Prevent throwing if already rolling or other states if needed
+            self.game.ready = False
             self.throw_dice()
+            
         if key == "m":
             self.game.move_bitch(1)
 
@@ -87,7 +89,6 @@ class Dice(ur.Entity):
         dt = ur.time.dt
         gravity = 15 # Adjust gravity strength
         ground_level = 0.2 # Approximate floor level
-        
 
         for i in self.dices:
             if i.ani:
@@ -175,3 +176,7 @@ class Dice(ur.Entity):
             values.append(face_values[facing_up])
         print(values)
         return values
+
+
+if __name__ == "__main__":
+    import main
